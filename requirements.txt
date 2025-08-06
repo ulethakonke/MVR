@@ -1,0 +1,4 @@
+streamlit
+pillow
+zstandard
+numpy
