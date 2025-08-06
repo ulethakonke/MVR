@@ -1,12 +1,35 @@
 import streamlit as st
+import sys
 import os
-from PIL import Image
-from src.encoder import pack_newspaper_page
-from src.decoder import unpack_newspaper_page
-from src.validator import validate_reconstruction
-from src.gtd import GenerativeTokenDictionary
-from src.utils import save_json, load_json
-import filecmp
+from pathlib import Path
+
+# Fix import path issues for both local and Streamlit Cloud
+current_dir = Path(__file__).parent
+src_dir = current_dir / "src"
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+# Alternative approach - add current directory to path
+if str(current_dir) not in sys.path:
+    sys.path.insert(0, str(current_dir))
+
+try:
+    from PIL import Image
+    from encoder import pack_newspaper_page
+    from decoder import unpack_newspaper_page
+    from validator import validate_reconstruction
+    from gtd import GenerativeTokenDictionary
+    from utils import save_json, load_json
+    import filecmp
+    
+    IMPORTS_SUCCESSFUL = True
+except ImportError as e:
+    st.error(f"Import error: {e}")
+    st.error("Some modules could not be imported. Please check your file structure.")
+    IMPORTS_SUCCESSFUL = False
+
+if not IMPORTS_SUCCESSFUL:
+    st.stop()
 
 # Configuration
 DATA_DIR = "data"
@@ -24,13 +47,25 @@ os.makedirs(REGENERATED_PAGES_DIR, exist_ok=True)
 os.makedirs(os.path.dirname(GTD_FILEPATH), exist_ok=True)
 
 # Initialize GTD manager
-gtd_manager = GenerativeTokenDictionary(gtd_filepath=GTD_FILEPATH)
-gtd_manager.build_gtd_from_dataset([], [])
+try:
+    gtd_manager = GenerativeTokenDictionary(gtd_filepath=GTD_FILEPATH)
+    gtd_manager.build_gtd_from_dataset([], [])
+except Exception as e:
+    st.error(f"Error initializing GTD manager: {e}")
+    st.stop()
 
 st.set_page_config(layout="wide", page_title="Soulzip MVR: Lossless Newspaper Compression")
 
 st.title("Soulzip MVR: Lossless Newspaper Compression Prototype 📰")
 st.markdown("---")
+
+# Debug info
+with st.expander("Debug Information"):
+    st.write("Current working directory:", os.getcwd())
+    st.write("Python path:", sys.path[:3])  # Show first 3 entries
+    st.write("Files in current directory:", os.listdir('.'))
+    if os.path.exists('src'):
+        st.write("Files in src directory:", os.listdir('src'))
 
 st.header("1. Upload Original Newspaper Page")
 uploaded_image = st.file_uploader("Upload Scanned Newspaper Image (PNG/JPG)", type=["png", "jpg", "jpeg"])
@@ -117,7 +152,7 @@ else:
                         
                         if os.path.exists(original_txt_path_from_manifest):
                             with open(original_txt_path_from_manifest, 'r', encoding='utf-8') as f:
-                                st.text_area("Original OCR Text", f.read(), height=300)
+                                st.text_area("Original OCR Text", f.read(), height=300, key="original_text")
                         else:
                             st.warning(f"Original text not found for display.")
 
@@ -125,7 +160,7 @@ else:
                         st.subheader("Reconstructed Page")
                         st.image(reconstructed_image_path, caption="Reconstructed Image", use_column_width=True)
                         with open(reconstructed_text_path, 'r', encoding='utf-8') as f:
-                            st.text_area("Reconstructed OCR Text", f.read(), height=300)
+                            st.text_area("Reconstructed OCR Text", f.read(), height=300, key="reconstructed_text")
 
                     st.subheader("Validation Results")
                     if validation_results.get("image_hash_match", False) and validation_results.get("text_hash_match", False):
